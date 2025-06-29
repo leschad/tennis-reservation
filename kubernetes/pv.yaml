@@ -1,0 +1,16 @@
+# Create this PersistentVolume to match your PVC
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hostpath-pv
+spec:
+  capacity:
+    storage: 4Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: hostpath-storage
+  hostPath:
+    path: /tmp/mysql-data  # This directory will be created automatically
+    type: DirectoryOrCreate

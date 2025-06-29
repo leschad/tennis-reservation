@@ -1,0 +1,145 @@
+# ConfigMap for MySQL initialization script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-script
+  namespace: tennis-res
+data:
+  db.sql: |
+    create schema if not exists svoboda;
+
+    use svoboda;
+
+    create table users (
+        id int auto_increment primary key,
+        name varchar(255) not null,
+        surname varchar(255) not null,
+        email varchar(255) not null
+    );
+
+    create table courts (
+        id int auto_increment primary key,
+        number int not null
+    );
+
+    create table reservations (
+        id int auto_increment primary key,
+        user_id int not null,
+        court_id int not null,
+        date date not null,
+        time time not null,
+        duration float not null,
+        foreign key (user_id) references users(id),
+        foreign key (court_id) references courts(id)
+    );
+
+    insert into users (name, surname, email) values ('Honoria', 'Fuzzens', 'hfuzzens0@blogspot.com');
+    insert into users (name, surname, email) values ('Fawn', 'Buscombe', 'fbuscombe1@java.com');
+    insert into users (name, surname, email) values ('Corette', 'Dominey', 'cdominey2@nbcnews.com');
+    insert into users (name, surname, email) values ('Hetty', 'Polotti', 'hpolotti3@state.gov');
+    insert into users (name, surname, email) values ('Mathe', 'MacMenamin', 'mmacmenamin4@skype.com');
+    insert into users (name, surname, email) values ('Shelley', 'Borrill', 'sborrill5@time.com');
+    insert into users (name, surname, email) values ('Dewain', 'Karus', 'dkarus6@berkeley.edu');
+    insert into users (name, surname, email) values ('Boot', 'Randerson', 'branderson7@alibaba.com');
+    insert into users (name, surname, email) values ('Katharina', 'Strotone', 'kstrotone8@goodreads.com');
+    insert into users (name, surname, email) values ('Stanly', 'Simakov', 'ssimakov9@e-recht24.de');
+
+    insert into courts (number) values (1);
+    insert into courts (number) values (2);
+    insert into courts (number) values (3);
+    insert into courts (number) values (4);
+
+    insert into reservations (user_id, court_id, date, time, duration) values (1, 1, '2025-01-01', '10:00:00', 1);
+    insert into reservations (user_id, court_id, date, time, duration) values (2, 2, '2025-01-01', '11:00:00', 1.5);
+    insert into reservations (user_id, court_id, date, time, duration) values (3, 3, '2025-01-01', '12:00:00', 1);
+    insert into reservations (user_id, court_id, date, time, duration) values (4, 4, '2025-01-01', '13:00:00', 2);
+    insert into reservations (user_id, court_id, date, time, duration) values (5, 1, '2025-01-01', '14:00:00', 1);
+
+---
+
+# PersistentVolumeClaim for MySQL data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: tennis-res
+spec:
+  resources:
+    requests:
+      storage: 4Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hostpath-storage
+
+---
+
+# Secret for MySQL root password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: tennis-res
+type: Opaque
+data:
+  password: ZXhhbXBsZQ==
+
+---
+
+# MySQL Pod with persistent storage and ConfigMap
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql-pod
+  namespace: tennis-res
+  labels:
+    app: mysql
+spec:
+  containers:
+  - name: mysql
+    image: mysql:latest
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: mysql-secret
+          key: password
+    ports:
+    - containerPort: 3306
+      name: mysql
+    volumeMounts:
+    - name: mysql-data
+      mountPath: /var/lib/mysql
+    - name: init-script
+      mountPath: /docker-entrypoint-initdb.d
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  volumes:
+  - name: mysql-data
+    persistentVolumeClaim:
+      claimName: mysql-pvc
+  - name: init-script
+    configMap:
+      name: mysql-init-script
+  restartPolicy: Always
+
+---
+
+# Service to expose MySQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: tennis-res
+spec:
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+    targetPort: 3306
+    name: mysql
+  type: ClusterIP
